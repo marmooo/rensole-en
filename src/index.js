@@ -51,8 +51,23 @@ function loadAudios() {
 }
 
 function loadConfig() {
+  loadGrade();
   if (localStorage.getItem("darkMode") == 1) {
     document.documentElement.dataset.theme = "dark";
+  }
+}
+
+function loadGrade() {
+  const grade = localStorage.getItem("rensole-en");
+  if (grade) {
+    const obj = document.getElementById("grade");
+    [...obj.options].forEach((g) => {
+      if (g.value == grade) {
+        g.selected = true;
+      } else {
+        g.selected = false;
+      }
+    });
   }
 }
 
@@ -67,41 +82,42 @@ function toggleDarkMode() {
 }
 
 async function getWordVector(lemma) {
-  const result = await rensoleWorker.db.query(
+  return rensoleWorker.db.query(
     `SELECT * FROM magnitude WHERE key="${escapeSql(lemma)}"`,
-  );
-  if (result[0]) {
-    const vector = new Array(300);
-    for (const [k, v] of Object.entries(result[0])) {
-      if (k.startsWith("dim_")) {
-        const pos = parseInt(k.slice(4));
-        vector[pos] = v;
+  ).then((row) => {
+    if (row[0]) {
+      const vector = new Array(300);
+      for (const [k, v] of Object.entries(row[0])) {
+        if (k.startsWith("dim_")) {
+          const pos = parseInt(k.slice(4));
+          vector[pos] = v;
+        }
       }
+      return vector;
     }
-    return vector;
-  }
+  });
 }
 
 async function getSiminyms(lemma) {
-  const row = await siminymWorker.db.query(
+  return siminymWorker.db.query(
     `SELECT words FROM siminyms WHERE lemma="${escapeSql(lemma)}"`,
-  );
-  if (row[0]) {
-    const words = JSON.parse(row[0].words);
-    return words.reverse();
-  } else {
-    return [];
-  }
+  ).then((row) => {
+    if (row[0]) {
+      const words = JSON.parse(row[0].words);
+      return words.reverse();
+    }
+  });
 }
 
 function showHint(hint) {
   let html = "";
   if (Object.keys(hint).length == 0) return html;
+  const m = (hint.type == "word") ? 2 : 4;
   const n = (hint.type == "word") ? 1 : 3;
   const text = hint.text;
   for (let i = 0; i < text.length; i++) {
-    if (text[i] == answer[i]) {
-      html += `<span class="hint2">${text[i]}</span>`;
+    if (text[i] == hint.target[i]) {
+      html += `<span class="hint${m}">${text[i]}</span>`;
     } else {
       html += `<span class="hint${n}">${text[i]}</span>`;
     }
@@ -117,33 +133,31 @@ function getHint(replyCount) {
         hint += "?";
       }
       holedAnswer = hint;
-      return { text: hint, type: "word" };
+      return { text: hint, type: "word", target: answer };
     case 3: {
-      const arr = pronounce.split(" ");
-      const poses = arr.map((str, i) => [str, i])
+      const poses = pronounce.map((str, i) => [str, i])
         .filter((x) => !/^[a-z]$/.test(x[0]))
         .map((x) => x[1]);
       const pos = poses[getRandomInt(0, poses.length)];
-      holedPronounce = arr.map((x, i) => {
+      holedPronounce = pronounce.map((x, i) => {
         return (i == pos) ? x : "?";
       });
-      return { text: holedPronounce, type: "pronounce" };
+      return { text: holedPronounce, type: "pronounce", target: pronounce };
     }
     case 5: {
       const pos = getRandomInt(0, answer.length);
       holedAnswer = holedAnswer.slice(0, pos) + answer[pos] +
         holedAnswer.slice(pos + 1);
-      return { text: holedAnswer, type: "word" };
+      return { text: holedAnswer, type: "word", target: answer };
     }
     case 7: {
-      const arr = pronounce.split(" ");
-      const poses = arr.map((str, i) => [str, i])
+      const poses = pronounce.map((str, i) => [str, i])
         .filter((_, i) => holedPronounce[i] == "?")
         .filter((x) => !/^[a-z]$/.test(x[0]))
         .map((x) => x[1]);
       const pos = poses[getRandomInt(0, poses.length)];
-      if (pos) holedPronounce[pos] = arr[pos];
-      return { text: holedPronounce, type: "pronounce" };
+      if (pos) holedPronounce[pos] = pronounce[pos];
+      return { text: holedPronounce, type: "pronounce", target: pronounce };
     }
     case 9:
       if (answer.length > 3) {
@@ -154,7 +168,7 @@ function getHint(replyCount) {
         const pos = poses[getRandomInt(0, poses.length)];
         holedAnswer = holedAnswer.slice(0, pos) + answer[pos] +
           holedAnswer.slice(pos + 1);
-        return { text: holedAnswer, type: "word" };
+        return { text: holedAnswer, type: "word", target: answer };
       } else {
         return {};
       }
@@ -232,18 +246,19 @@ function getRandomInt(min, max) {
   return Math.floor(Math.random() * (max - min)) + min;
 }
 
-async function loadProblems() {
-  await fetch("pronounce.tsv")
+function loadProblems() {
+  return fetch("pronounce.tsv")
     .then((response) => response.text())
     .then((text) => {
       text.trimEnd().split("\n").forEach((line) => {
         vocabularies.push(line.split("\t"));
       });
-      changeGrade();
+      loadWorkers();
     });
 }
 
-async function loadSiminymWorker(answer, grade) {
+function loadSiminymWorker() {
+  let grade = localStorage.getItem("rensole-en");
   if (!grade) {
     const obj = document.getElementById("grade");
     grade = obj.options[obj.selectedIndex].value;
@@ -252,58 +267,78 @@ async function loadSiminymWorker(answer, grade) {
     from: "jsonconfig",
     configUrl: `/siminym-en/db/${grade}/config.json`,
   };
-  siminymWorker = await createDbWorker(
+  return createDbWorker(
     [config],
     "/siminym-en/sql.js-httpvfs/sqlite.worker.js",
     "/siminym-en/sql.js-httpvfs/sql-wasm.wasm",
   );
-  mostSimilars = await getSiminyms(answer);
 }
 
-async function loadRensoWorker(answer) {
+function loadRensoWorker() {
   const config = {
     from: "jsonconfig",
     configUrl: "/rensole-en/db/config.json",
   };
-  rensoleWorker = await createDbWorker(
+  return createDbWorker(
     [config],
     "/rensole-en/sql.js-httpvfs/sqlite.worker.js",
     "/rensole-en/sql.js-httpvfs/sql-wasm.wasm",
   );
-  answerVector = await getWordVector(answer);
 }
 
-function restart() {
-  const loading = document.getElementById("loading");
-  loading.classList.remove("d-none");
-  replyCount = 0;
-  while (renso.firstChild) renso.firstChild.remove();
-  const pos = getRandomInt(0, problems.length);
-  answer = problems[pos][0];
-  pronounce = problems[pos][1];
-  document.getElementById("answer").classList.add("d-none");
+function loadProblemVectors() {
   const promises = [
     getSiminyms(answer),
     getWordVector(answer),
   ];
-  Promise.all(promises).then((result) => {
+  return Promise.all(promises).then((result) => {
     mostSimilars = result[0];
     answerVector = result[1];
     document.getElementById("searchText").focus();
-    loading.classList.add("d-none");
+    document.getElementById("loading").classList.add("d-none");
+  });
+}
+
+async function changeProblem() {
+  document.getElementById("loading").classList.remove("d-none");
+  document.getElementById("answer").classList.add("d-none");
+  replyCount = 0;
+  const pos = getRandomInt(0, problems.length);
+  answer = problems[pos][0];
+  pronounce = problems[pos][1].split(" ");
+  const renso = document.getElementById("renso");
+  while (renso.firstChild) renso.firstChild.remove();
+  await loadProblemVectors();
+}
+
+async function loadWorkers() {
+  const obj = document.getElementById("grade");
+  const grade = obj.options[obj.selectedIndex].value;
+  problems = vocabularies.slice(0, parseInt(grade));
+  const promises = [
+    loadSiminymWorker(),
+    loadRensoWorker(),
+  ];
+  await Promise.all(promises).then((workers) => {
+    // if (siminymWorker) {
+    //   siminymWorker.db.close();
+    //   siminymWorker.worker.terminate();  // TODO: Comlink 4.3.1
+    // }
+    // if (rensoleWorker) {
+    //   rensoleWorker.db.close();
+    //   siminymWorker.worker.terminate();  // TODO: Comlink 4.3.1
+    // }
+    siminymWorker = workers[0];
+    rensoleWorker = workers[1];
+    changeProblem();
   });
 }
 
 function changeGrade() {
   const obj = document.getElementById("grade");
   const grade = obj.options[obj.selectedIndex].value;
-  loadSiminymWorker(answer, grade);
-  replyCount = 0;
-  while (renso.firstChild) renso.firstChild.remove();
-  problems = vocabularies.slice(0, parseInt(grade));
-  const pos = getRandomInt(0, problems.length);
-  answer = problems[pos][0];
-  pronounce = problems[pos][1];
+  localStorage.setItem("rensole-en", grade);
+  location.reload();
 }
 
 const vocabularies = [];
@@ -318,24 +353,14 @@ let holedPronounce;
 let rensoleWorker;
 let siminymWorker;
 loadConfig();
-loadProblems().then(() => {
-  const loading = document.getElementById("loading");
-  loading.classList.remove("d-none");
-  loadSiminymWorker(answer);
-  loadRensoWorker(answer);
-  const renso = document.getElementById("renso");
-  while (renso.firstChild) renso.firstChild.remove();
-  loading.classList.add("d-none");
-});
+loadProblems();
 
 document.addEventListener("keydown", function (event) {
-  if (event.key == "Enter") {
-    search();
-  }
+  if (event.key == "Enter") search();
 }, false);
 document.getElementById("toggleDarkMode").onclick = toggleDarkMode;
 document.getElementById("search").onclick = search;
-document.getElementById("restart").onclick = restart;
+document.getElementById("restart").onclick = changeProblem;
 document.getElementById("grade").onchange = changeGrade;
 document.addEventListener("click", unlockAudio, {
   once: true,
