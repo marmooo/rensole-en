@@ -567,7 +567,7 @@ function toggleDarkMode() {
         document.documentElement.dataset.theme = "dark";
     }
 }
-async function getWordVector(lemma) {
+function getWordVector(lemma) {
     return rensoleWorker.db.query(`SELECT * FROM magnitude WHERE key="${escapeSql(lemma)}"`).then((row)=>{
         if (row[0]) {
             const vector = new Array(300);
@@ -581,7 +581,7 @@ async function getWordVector(lemma) {
         }
     });
 }
-async function getSiminyms(lemma) {
+function getSiminyms(lemma) {
     return siminymWorker.db.query(`SELECT words FROM siminyms WHERE lemma="${escapeSql(lemma)}"`).then((row)=>{
         if (row[0]) {
             const words = JSON.parse(row[0].words);
@@ -604,39 +604,58 @@ function showHint(hint) {
     }
     return html;
 }
-function getHint(replyCount1) {
-    let hint = "";
-    switch(replyCount1){
-        case 1:
-            for(let i1 = 0; i1 < answer.length; i1++){
-                hint += "?";
-            }
-            holedAnswer = hint;
-            return {
-                text: hint,
-                type: "word",
-                target: answer
-            };
-        case 3:
+function pronounceHint(count) {
+    if (count == 1) {
+        const poses = pronounce.map((str, i)=>[
+                str,
+                i
+            ]
+        ).filter((x)=>!/^[a-z]$/.test(x[0])
+        ).map((x)=>x[1]
+        );
+        const pos = poses[getRandomInt(0, poses.length)];
+        holedPronounce = pronounce.map((x, i)=>{
+            return i == pos ? x : "?";
+        });
+        return {
+            text: holedPronounce,
+            type: "pronounce",
+            target: pronounce
+        };
+    } else {
+        const poses = pronounce.map((str, i)=>[
+                str,
+                i
+            ]
+        ).filter((_, i)=>holedPronounce[i] == "?"
+        ).filter((x)=>!/^[a-z]$/.test(x[0])
+        ).map((x)=>x[1]
+        );
+        const pos = poses[getRandomInt(0, poses.length)];
+        if (pos) holedPronounce[pos] = pronounce[pos];
+        return {
+            text: holedPronounce,
+            type: "pronounce",
+            target: pronounce
+        };
+    }
+}
+function wordHint(count) {
+    switch(count){
+        case 0:
             {
-                const poses = pronounce.map((str, i)=>[
-                        str,
-                        i
-                    ]
-                ).filter((x)=>!/^[a-z]$/.test(x[0])
-                ).map((x)=>x[1]
-                );
-                const pos = poses[getRandomInt(0, poses.length)];
-                holedPronounce = pronounce.map((x, i)=>{
-                    return i == pos ? x : "?";
-                });
+                let hint = "";
+                for(let i = 0; i < answer.length; i++){
+                    hint += "?";
+                }
+                holedAnswer = hint;
                 return {
-                    text: holedPronounce,
-                    type: "pronounce",
-                    target: pronounce
+                    text: hint,
+                    type: "word",
+                    target: answer
                 };
             }
-        case 5:
+        case 1:
             {
                 const pos = getRandomInt(0, answer.length);
                 holedAnswer = holedAnswer.slice(0, pos) + answer[pos] + holedAnswer.slice(pos + 1);
@@ -646,43 +665,41 @@ function getHint(replyCount1) {
                     target: answer
                 };
             }
-        case 7:
+        default:
             {
-                const poses = pronounce.map((str, i)=>[
-                        str,
-                        i
-                    ]
-                ).filter((_, i)=>holedPronounce[i] == "?"
-                ).filter((x)=>!/^[a-z]$/.test(x[0])
-                ).map((x)=>x[1]
-                );
-                const pos = poses[getRandomInt(0, poses.length)];
-                if (pos) holedPronounce[pos] = pronounce[pos];
-                return {
-                    text: holedPronounce,
-                    type: "pronounce",
-                    target: pronounce
-                };
+                if (answer.length > count) {
+                    const poses = holedAnswer.split("").map((str, i)=>[
+                            str,
+                            i
+                        ]
+                    ).filter((x)=>x[0] == "?"
+                    ).map((x)=>x[1]
+                    );
+                    const pos = poses[getRandomInt(0, poses.length)];
+                    holedAnswer = holedAnswer.slice(0, pos) + answer[pos] + holedAnswer.slice(pos + 1);
+                    return {
+                        text: holedAnswer,
+                        type: "word",
+                        target: answer
+                    };
+                } else {
+                    return {};
+                }
             }
+    }
+}
+function getHint(replyCount1) {
+    switch(replyCount1){
+        case 1:
+            return wordHint(1);
+        case 3:
+            return pronounceHint(1);
+        case 5:
+            return wordHint(2);
+        case 7:
+            return pronounceHint(2);
         case 9:
-            if (answer.length > 3) {
-                const poses = holedAnswer.split("").map((str, i)=>[
-                        str,
-                        i
-                    ]
-                ).filter((x)=>x[0] == "?"
-                ).map((x)=>x[1]
-                );
-                const pos = poses[getRandomInt(0, poses.length)];
-                holedAnswer = holedAnswer.slice(0, pos) + answer[pos] + holedAnswer.slice(pos + 1);
-                return {
-                    text: holedAnswer,
-                    type: "word",
-                    target: answer
-                };
-            } else {
-                return {};
-            }
+            return wordHint(3);
         default:
             return {};
     }
