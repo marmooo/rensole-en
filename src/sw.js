@@ -1,7 +1,8 @@
-var CACHE_NAME = "2022-05-02 00:00";
+var CACHE_NAME = "2022-05-03 10:20";
 var urlsToCache = [
   "/rensole-en/",
   "/rensole-en/index.js",
+  "/rensole-en/pronounce.tsv",
   "/rensole-en/sql.js-httpvfs/sql-wasm.wasm",
   "/rensole-en/sql.js-httpvfs/sqlite.worker.js",
   "/rensole-en/favicon/favicon.svg",
