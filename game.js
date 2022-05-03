@@ -20,20 +20,31 @@ async function loadCMUdictIPA() {
   return dict;
 }
 
-async function build(threshold) {
-  const result = [];
+async function build(grades, threshold) {
+  const words = [];
+  const poses = [];
   const mGSL = await loadmGSL();
   const ipaDict = await loadCMUdictIPA();
-  mGSL.slice(0, threshold).forEach((word) => {
+  let gradePos = 0;
+  for (let i = 0; i < mGSL.length; i++) {
+    if (i >= threshold) break;
+    const word = mGSL[i];
+    if (word.length == 1) continue;
+    if (i == grades[gradePos] - 1) {
+      poses.push(words.length);
+      gradePos += 1;
+    }
     if (word in ipaDict) {
-      result.push(`${word}\t${ipaDict[word]}`);
+      words.push(`${word}\t${ipaDict[word]}`);
     } else {
       console.log(`error: ${word}`);
     }
-  });
-  return result;
+  }
+  return [words, poses];
 }
 
+const grades = [1000, 3000, 5000, 10000];
 const threshold = 10000;
-const result = await build(threshold);
-Deno.writeTextFileSync("src/pronounce.tsv", result.join("\n"));
+const [words, poses] = await build(grades, threshold);
+const result = poses.join(",") + "\n" + words.join("\n");
+Deno.writeTextFileSync("src/pronounce.tsv", result);
