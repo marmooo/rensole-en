@@ -2,6 +2,11 @@
 
 [An association game using similarity between words](https://marmooo.github.io/rensole-en/).
 
+## Requirements
+
+- [rye](https://github.com/mitsuhiko/rye)
+- `sudo apt install clang` for [spotify/annoy](https://github.com/spotify/annoy)
+
 ## Installation
 
 - install [marmooo/mGSL](https://github.com/marmooo/mgsl) licensed under the
@@ -13,6 +18,7 @@
 - install [marmooo/siminym-ja](https://github.com/marmooo/siminym-ja) licensed
   under the [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
 - `npm install`
+- `rye sync`
 
 ## Build
 

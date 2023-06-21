@@ -1,10 +1,10 @@
-.direnv/
-.envrc
+.venv/
 node_modules/
 crawl-300d-2M.vec
 crawl-300d-2M-small.vec
 crawl-300d-2M-small.magnitude
 remote.db
 mGSL
-siminym-en
 cmudict-ipa
+siminym-en-repo
+siminym-en
