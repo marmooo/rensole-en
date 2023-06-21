@@ -30,7 +30,7 @@ async function build(grades, threshold) {
     if (i >= threshold) break;
     const word = mGSL[i];
     if (word.length == 1) continue;
-    if (i == grades[gradePos] - 1) {
+    if (i >= grades[gradePos] - 1) {
       poses.push(words.length);
       gradePos += 1;
     }
