@@ -183,9 +183,9 @@ function getHint(replyCount) {
 
 function showAnswer(cleared) {
   if (cleared) {
-    playAudio(correctAudio);
+    playAudio("correct");
   } else {
-    playAudio(incorrectAudio);
+    playAudio("incorrect");
   }
   document.getElementById("answer").classList.remove("d-none");
   const animations = [
