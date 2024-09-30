@@ -1,9 +1,15 @@
-import { readLines } from "https://deno.land/std/io/mod.ts";
+import { TextLineStream } from "jsr:@std/streams/text-line-stream";
+
+function getLineStream(file) {
+  return file.readable
+    .pipeThrough(new TextDecoderStream())
+    .pipeThrough(new TextLineStream());
+}
 
 async function loadmGSL() {
   const dict = [];
-  const fileReader = await Deno.open("mGSL/dist/mGSL.lst");
-  for await (const line of readLines(fileReader)) {
+  const file = await Deno.open("mGSL/dist/mGSL.lst");
+  for await (const line of getLineStream(file)) {
     const word = line.split("\t", 1)[0];
     dict.push(word);
   }
@@ -12,8 +18,8 @@ async function loadmGSL() {
 
 async function loadCMUdictIPA() {
   const dict = {};
-  const fileReader = await Deno.open("cmudict-ipa/cmudict.ipa");
-  for await (const line of readLines(fileReader)) {
+  const file = await Deno.open("cmudict-ipa/cmudict.ipa");
+  for await (const line of getLineStream(file)) {
     const [word, ipa] = line.split("\t");
     dict[word] = ipa;
   }
