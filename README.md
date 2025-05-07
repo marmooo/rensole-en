@@ -1,6 +1,6 @@
 # Rensole-en
 
-[An association game using similarity between words](https://marmooo.github.io/rensole-en/).
+[A word association game using similarity between words](https://marmooo.github.io/rensole-en/).
 
 ## Requirements
 
